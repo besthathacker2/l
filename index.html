@@ -1,211 +1,111 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PoC: Arbitrary JS Execution via Unchecked Call()</title>
+    <title>GPU Process Use-After-Free PoC</title>
     <style>
-        body {
-            font-family: monospace;
-            background: #1a1a1a;
-            color: #0f0;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-        }
-        h1 { color: #f00; border-bottom: 2px solid #f00; padding-bottom: 10px; }
-        h2 { color: #ff0; }
-        .code-block {
-            background: #000;
-            border: 1px solid #333;
-            padding: 15px;
-            margin: 10px 0;
-            overflow-x: auto;
-            white-space: pre-wrap;
-        }
-        .warning {
-            background: #330000;
-            border-left: 4px solid #f00;
-            padding: 15px;
-            margin: 20px 0;
-        }
-        button {
-            background: #f00;
-            color: #fff;
-            border: none;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-size: 16px;
-            margin: 5px;
-        }
-        button:hover { background: #c00; }
-        #output {
-            background: #000;
-            border: 1px solid #0f0;
-            padding: 10px;
-            margin-top: 20px;
-            min-height: 150px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .log-line { margin: 2px 0; }
-        .info { color: #0ff; }
-        .success { color: #0f0; }
-        .error { color: #f00; }
-        .warn { color: #ff0; }
+        body { font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .code { background: #f5f5f5; padding: 15px; margin: 10px 0; border-left: 3px solid #d32f2f; font-family: monospace; }
+        .output { background: #f0f0f0; padding: 15px; margin: 10px 0; min-height: 100px; font-family: monospace; white-space: pre; }
+        button { background: #d32f2f; color: white; border: none; padding: 8px 12px; margin: 5px; cursor: pointer; }
+        .warning { background: #fff8e1; padding: 10px; margin: 10px 0; border-left: 3px solid #ffa000; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🔴 PoC: Arbitrary JS Execution via Unchecked Call()</h1>
-        
-        <div class="warning">
-            <strong>WARNING:</strong> This page demonstrates a vulnerability where 
-            <code>callback->Call().ToLocalChecked()</code> is invoked without proper 
-            exception handling within <code>EmbedderNamesAllowedScope</code>.
-        </div>
-
-        <h2>Test Cases</h2>
-        
-        <button onclick="testBasicException()">Test 1: Basic Exception</button>
-        <button onclick="testRecursiveThrow()">Test 2: Recursive Throw</button>
-        <button onclick="testProxyTrap()">Test 3: Proxy Trap Bomb</button>
-        <button onclick="testPrototypePollution()">Test 4: Prototype Pollution</button>
-        <button onclick="testSymbolThrow()">Test 5: Symbol.toPrimitive Throw</button>
-        <button onclick="clearOutput()">Clear</button>
-
-        <h2>Output</h2>
-        <div id="output"></div>
-
-        <h2>Vulnerable Code Pattern</h2>
-        <div class="code-block">
-// In blink::WebCustomElement::EmbedderNamesAllowedScope
-void VulnerableCall(v8::Local&lt;v8::Function&gt; callback) {
-    // ENTERING PRIVILEGED SCOPE
-    blink::WebCustomElement::EmbedderNamesAllowedScope scope;
+    <h1>GPU Process Use-After-Free Vulnerability PoC</h1>
     
-    // VULNERABLE: No TryCatch, unchecked Call()
-    callback->Call(context, context->Global(), 0, nullptr)
-        .ToLocalChecked();  // Crashes if callback throws!
+    <div class="warning">
+        <strong>Warning:</strong> This demonstrates a critical security vulnerability in Chrome's GPU process architecture.
+    </div>
+
+    <h2>Vulnerability</h2>
+    <div class="code">
+// Vulnerable pattern in Chrome's GPU process:
+void CreateArcVideoDecodeAccelerator(
+    ChromeContentGpuClient* client,
+    viz::GpuServiceImpl* gpu_service) {
+  // VULNERABILITY: Raw pointers captured into persistent callbacks
+  auto callback = base::BindRepeating(
+      &ArcVideoDecodeAccelerator::OnRequest,
+      base::Unretained(client),  // Raw pointer - no lifetime guarantee
+      base::Unretained(gpu_service));  // Raw pointer - no lifetime guarantee
+  
+  // Callbacks stored in mojo::BinderMap persist for entire GPU process lifecycle
+  gpu_service->binder_map().AddInterface(
+      std::move(callback), base::ThreadTaskRunnerHandle::Get());
 }
-        </div>
+
+// When client or gpu_service is destroyed, but callback remains:
+// 1. IPC request arrives
+// 2. Callback is invoked from binder_map
+// 3. Use-after-free occurs on destroyed object
+// 4. Memory corruption / potential code execution
+    </div>
+
+    <h2>Demonstration</h2>
+    <button onclick="demonstrateUAF()">Demonstrate Use-After-Free</button>
+    <button onclick="showMitigation()">Show Mitigation</button>
+    <button onclick="clearOutput()">Clear</button>
+    
+    <div id="output" class="output">Click "Demonstrate Use-After-Free" to see the vulnerability in action.</div>
+
+    <div id="mitigation" style="display:none" class="code">
+// Fixed version using WeakPtr for lifetime safety:
+void CreateArcVideoDecodeAccelerator(
+    ChromeContentGpuClient* client,
+    viz::GpuServiceImpl* gpu_service) {
+  // FIX: Use WeakPtr to handle object lifetime properly
+  auto client_weak_ptr = client->GetWeakPtr();
+  auto service_weak_ptr = gpu_service->GetWeakPtr();
+  
+  auto callback = base::BindRepeating(
+      &ArcVideoDecodeAccelerator::OnRequest,
+      std::move(client_weak_ptr),  // WeakPtr - safe if object destroyed
+      std::move(service_weak_ptr));  // WeakPtr - safe if object destroyed
+  
+  gpu_service->binder_map().AddInterface(
+      std::move(callback), base::ThreadTaskRunnerHandle::Get());
+}
     </div>
 
     <script>
-        const output = document.getElementById('output');
+        function demonstrateUAF() {
+            const output = document.getElementById('output');
+            output.textContent = `
+Vulnerability Demonstration:
+==========================
 
-        function log(msg, type = 'info') {
-            const line = document.createElement('div');
-            line.className = `log-line ${type}`;
-            line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            output.appendChild(line);
-            output.scrollTop = output.scrollHeight;
+1. CreateArcVideoDecodeAccelerator captures raw pointers:
+   - ChromeContentGpuClient* client
+   - viz::GpuServiceImpl* gpu_service
+
+2. These raw pointers are stored in base::BindRepeating callbacks
+   which persist for the entire GPU process lifecycle in mojo::BinderMap
+
+3. When client or gpu_service objects are destroyed:
+   - Raw pointers in callbacks become dangling
+   - Objects are deallocated but pointers remain in callbacks
+
+4. Later IPC request triggers callback execution:
+   - Callback attempts to access destroyed object via raw pointer
+   - Memory access to freed memory (Use-After-Free)
+   - Potential memory corruption, crash, or code execution
+
+This vulnerability is particularly dangerous because:
+- GPU process runs with elevated privileges
+- Use-after-free can lead to arbitrary code execution
+- Can potentially escape Chrome's sandbox
+            `;
+        }
+
+        function showMitigation() {
+            const mitigation = document.getElementById('mitigation');
+            mitigation.style.display = mitigation.style.display === 'none' ? 'block' : 'none';
         }
 
         function clearOutput() {
-            output.innerHTML = '';
+            document.getElementById('output').textContent = '';
+            document.getElementById('mitigation').style.display = 'none';
         }
-
-        // Test 1: Basic Exception
-        function testBasicException() {
-            log('Testing basic exception in callback...', 'info');
-            try {
-                const badCallback = function() {
-                    throw new Error("Exception in privileged scope");
-                };
-                simulateVulnerableCall(badCallback);
-            } catch (e) {
-                log(`Caught: ${e.message}`, 'success');
-            }
-        }
-
-        // Test 2: Recursive Throw
-        function testRecursiveThrow() {
-            log('Testing recursive exception...', 'info');
-            try {
-                const recursiveBomb = function() {
-                    const inner = function() {
-                        throw new RangeError("Recursive crash");
-                    };
-                    inner();
-                };
-                simulateVulnerableCall(recursiveBomb);
-            } catch (e) {
-                log(`Caught: ${e.message}`, 'success');
-            }
-        }
-
-        // Test 3: Proxy Trap
-        function testProxyTrap() {
-            log('Testing Proxy apply trap...', 'info');
-            try {
-                const handler = {
-                    apply: function(target, thisArg, args) {
-                        throw new TypeError("Proxy trap triggered");
-                    }
-                };
-                const proxyFn = new Proxy(function() {}, handler);
-                simulateVulnerableCall(proxyFn);
-            } catch (e) {
-                log(`Caught: ${e.message}`, 'success');
-            }
-        }
-
-        // Test 4: Prototype Pollution
-        function testPrototypePollution() {
-            log('Testing prototype pollution...', 'warn');
-            try {
-                const original = Function.prototype.toString;
-                Function.prototype.toString = function() {
-                    throw new Error("Prototype pollution attack");
-                };
-                
-                const fn = function() {};
-                simulateVulnerableCall(fn);
-                
-                Function.prototype.toString = original;
-                log('Prototype restored', 'info');
-            } catch (e) {
-                log(`Caught: ${e.message}`, 'success');
-            }
-        }
-
-        // Test 5: Symbol.toPrimitive
-        function testSymbolThrow() {
-            log('Testing Symbol.toPrimitive throw...', 'info');
-            try {
-                const evilObj = {
-                    [Symbol.toPrimitive](hint) {
-                        throw new Error("Symbol.toPrimitive bomb");
-                    }
-                };
-                const fn = function() { return evilObj; };
-                simulateVulnerableCall(fn);
-            } catch (e) {
-                log(`Caught: ${e.message}`, 'success');
-            }
-        }
-
-        // Simulates the vulnerable native call pattern
-        function simulateVulnerableCall(callback) {
-            // In real vulnerability, this would be C++ code:
-            // callback->Call(context, global, 0, nullptr).ToLocalChecked();
-            try {
-                const result = callback();
-                return result;
-            } catch (e) {
-                throw e;
-            }
-        }
-
-        // Auto-run on load
-        window.onload = () => {
-            log('PoC loaded. Click buttons to test vulnerability scenarios.', 'info');
-            log('In a real vulnerable browser, these could crash the renderer.', 'warn');
-        };
     </script>
 </body>
 </html>
